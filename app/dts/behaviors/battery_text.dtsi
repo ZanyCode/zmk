@@ -1,0 +1,20 @@
+/*
+ * Copyright (c) 2025 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <dt-bindings/zmk/behaviors.h>
+
+/ {
+    behaviors {
+#if ZMK_BEHAVIOR_OMIT(BAT_TEXT)
+        /omit-if-no-ref/
+#endif
+        bat_text: battery_text {
+            compatible = "zmk,behavior-battery-text";
+            #binding-cells = <0>;
+            display-name = "Battery Text";
+        };
+    };
+};
