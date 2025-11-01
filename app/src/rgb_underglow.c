@@ -18,6 +18,11 @@
 #include <drivers/ext_power.h>
 
 #include <zmk/rgb_underglow.h>
+#include <zmk/battery.h>
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+#include <zmk/split/central.h>
+#endif
 
 #include <zmk/activity.h>
 #include <zmk/usb.h>
@@ -458,6 +463,119 @@ int zmk_rgb_underglow_change_spd(int direction) {
     }
 
     return zmk_rgb_underglow_save_state();
+}
+
+static struct led_rgb battery_to_color(uint8_t battery_level) {
+    struct zmk_led_hsb hsb;
+
+    // Map battery percentage to hue (0-120 degrees)
+    // 0% = Red (0°), 50% = Yellow (60°), 100% = Green (120°)
+    if (battery_level >= 100) {
+        hsb.h = 120; // Green
+    } else {
+        hsb.h = (battery_level * 120) / 100;
+    }
+
+    hsb.s = 100; // Full saturation
+    hsb.b = 50;  // Medium brightness
+
+    return hsb_to_rgb(hsb_scale_zero_max(hsb));
+}
+
+static int show_battery_level(uint8_t percentage) {
+    if (!led_strip)
+        return -ENODEV;
+
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER)
+    if (ext_power != NULL) {
+        int rc = ext_power_enable(ext_power);
+        if (rc != 0) {
+            LOG_ERR("Unable to enable EXT_POWER: %d", rc);
+        }
+    }
+#endif
+
+    // Calculate color based on battery level
+    struct led_rgb battery_color = battery_to_color(percentage);
+    struct led_rgb off_color = {.r = 0, .g = 0, .b = 0};
+
+    // Calculate how many LEDs to light up (progress bar style)
+    // Each LED represents a percentage of the battery
+    int leds_lit = (percentage * STRIP_NUM_PIXELS + 50) / 100;  // Round to nearest
+
+    // Ensure at least 1 LED is lit if battery > 0%, and don't exceed total
+    if (percentage > 0 && leds_lit == 0) {
+        leds_lit = 1;
+    }
+    if (leds_lit > STRIP_NUM_PIXELS) {
+        leds_lit = STRIP_NUM_PIXELS;
+    }
+
+    // Set all LEDs as progress bar
+    for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+        if (i < leds_lit) {
+            pixels[i] = battery_color;
+        } else {
+            pixels[i] = off_color;
+        }
+    }
+
+    // Update the LED strip
+    int err = led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
+    if (err < 0) {
+        LOG_ERR("Failed to update the RGB strip (%d)", err);
+        return err;
+    }
+
+    // Set state
+    state.on = true;
+    k_timer_stop(&underglow_tick);
+
+    LOG_DBG("Battery level displayed: %d%% (%d/%d LEDs)", percentage, leds_lit, STRIP_NUM_PIXELS);
+
+    return 0;
+}
+
+int zmk_rgb_underglow_toggle_battery_indicator_left(void) {
+    if (!led_strip)
+        return -ENODEV;
+
+    // If strip is on, turn it off
+    if (state.on) {
+        return zmk_rgb_underglow_off();
+    }
+
+    // Otherwise, turn on with local battery indicator
+    uint8_t battery_level = zmk_battery_state_of_charge();
+    LOG_DBG("Local battery level: %d%%", battery_level);
+
+    return show_battery_level(battery_level);
+}
+
+int zmk_rgb_underglow_toggle_battery_indicator_right(void) {
+    if (!led_strip)
+        return -ENODEV;
+
+    // If strip is on, turn it off
+    if (state.on) {
+        return zmk_rgb_underglow_off();
+    }
+
+    // Otherwise, turn on with peripheral battery indicator
+    uint8_t battery_level = 0;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+    int ret = zmk_split_central_get_peripheral_battery_level(0, &battery_level);
+    if (ret < 0) {
+        LOG_WRN("Failed to get peripheral battery level: %d", ret);
+        battery_level = 0;
+    } else {
+        LOG_DBG("Peripheral battery level: %d%%", battery_level);
+    }
+#else
+    LOG_DBG("Split battery fetching not enabled, peripheral will show 0%%");
+#endif
+
+    return show_battery_level(battery_level);
 }
 
 #if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE) ||                                          \

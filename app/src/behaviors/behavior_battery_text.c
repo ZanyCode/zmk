@@ -85,10 +85,11 @@ static int queue_percentage(const struct zmk_behavior_binding_event *event, uint
 
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
+    printk("YOOOOOOOOOOOOOO");
     LOG_DBG("Battery text behavior pressed");
 
-    const uint32_t tap_ms = 10;
-    const uint32_t wait_ms = 10;
+    const uint32_t tap_ms = 20;
+    const uint32_t wait_ms = 30;
 
     // Get local (central) battery level
     uint8_t local_battery = zmk_battery_state_of_charge();
@@ -111,7 +112,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
     // Output format: "L:XX% R:YY%"
 
     // "L"
-    queue_char(&event, LS(L), tap_ms, wait_ms);
+    queue_char(&event, L, tap_ms, wait_ms);
 
     // ":"
     queue_char(&event, COLON, tap_ms, wait_ms);
@@ -126,7 +127,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
     queue_char(&event, SPACE, tap_ms, wait_ms);
 
     // "R"
-    queue_char(&event, LS(R), tap_ms, wait_ms);
+    queue_char(&event, R, tap_ms, wait_ms);
 
     // ":"
     queue_char(&event, COLON, tap_ms, wait_ms);
@@ -156,7 +157,7 @@ static const struct behavior_driver_api behavior_battery_text_driver_api = {
 static int behavior_battery_text_init(const struct device *dev) { return 0; }
 
 #define BAT_TEXT_INST(n)                                                                           \
-    BEHAVIOR_DT_INST_DEFINE(n, behavior_battery_text_init, NULL, NULL, NULL, POST_KERNEL,         \
+    BEHAVIOR_DT_INST_DEFINE(n, behavior_battery_text_init, NULL, NULL, NULL, POST_KERNEL,          \
                             CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,                                   \
                             &behavior_battery_text_driver_api);
 

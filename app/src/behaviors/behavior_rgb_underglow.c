@@ -86,6 +86,16 @@ static const struct behavior_parameter_value_metadata no_arg_values[] = {
         .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
         .value = RGB_EFR_CMD,
     },
+    {
+        .display_name = "Battery Indicator Left",
+        .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+        .value = RGB_TOG_BAT_LEFT_CMD,
+    },
+    {
+        .display_name = "Battery Indicator Right",
+        .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+        .value = RGB_TOG_BAT_RIGHT_CMD,
+    },
 };
 
 static const struct behavior_parameter_metadata_set no_args_set = {
@@ -242,6 +252,10 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
         return zmk_rgb_underglow_set_hsb((struct zmk_led_hsb){.h = (binding->param2 >> 16) & 0xFFFF,
                                                               .s = (binding->param2 >> 8) & 0xFF,
                                                               .b = binding->param2 & 0xFF});
+    case RGB_TOG_BAT_LEFT_CMD:
+        return zmk_rgb_underglow_toggle_battery_indicator_left();
+    case RGB_TOG_BAT_RIGHT_CMD:
+        return zmk_rgb_underglow_toggle_battery_indicator_right();
     }
 
     return -ENOTSUP;
